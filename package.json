@@ -4,12 +4,15 @@
   "version": "1.0.0",
   "scripts": {
     "build:storage": "pnpm --filter @doc-clf/storage build",
+    "build:synth-data": "pnpm --filter @doc-clf/synth-data build",
     "build:backend": "pnpm build:storage && pnpm --filter backend build",
     "build:pipeline": "pnpm build:storage && pnpm --filter pipeline build",
     "dev:api": "pnpm build:storage && pnpm --filter backend start:dev",
     "dev:worker": "pnpm build:storage && pnpm --filter pipeline start:dev",
     "lint": "eslint . --ext .ts",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "gen:data": "pnpm build:storage && pnpm --filter @doc-clf/synth-data gen"
+
   },
   "devDependencies": {
     "eslint": "^8.0.0",

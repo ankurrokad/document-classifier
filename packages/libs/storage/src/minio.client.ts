@@ -1,5 +1,39 @@
 // @ts-ignore - minio doesn't have TypeScript types
 import * as Minio from 'minio';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as fs from 'fs';
+
+// Load .env file if not already loaded
+// This ensures the storage library can work independently when imported
+// We check if env vars are missing, and if so, try to load from .env file
+if (!process.env.MINIO_ENDPOINT || !process.env.MINIO_ACCESS_KEY || !process.env.MINIO_SECRET_KEY) {
+  // Try multiple possible paths to find the root .env file
+  // This works whether running from root, packages, or compiled dist folders
+  const possiblePaths = [
+    path.resolve(process.cwd(), '.env'), // Current working directory
+    path.resolve(process.cwd(), '../.env'), // One level up
+    path.resolve(process.cwd(), '../../.env'), // Two levels up (from packages/*)
+    path.resolve(process.cwd(), '../../../.env'), // Three levels up (from packages/libs/*)
+    path.resolve(__dirname, '../../../../.env'), // From dist folder (compiled)
+    path.resolve(__dirname, '../../../.env'), // Alternative from dist
+  ];
+
+  let envPath: string | undefined;
+  for (const envFile of possiblePaths) {
+    if (fs.existsSync(envFile)) {
+      envPath = envFile;
+      break;
+    }
+  }
+
+  if (envPath) {
+    dotenv.config({ path: envPath, override: false });
+  } else {
+    // Fallback: try default location
+    dotenv.config({ override: false });
+  }
+}
 
 export class MinioStorage {
   private client: Minio.Client;
@@ -27,8 +61,16 @@ export class MinioStorage {
     });
   }
 
-  async uploadBuffer(bucket: string, key: string, buffer: Buffer) {
-    return this.client.putObject(bucket, key, buffer);
+  async ensureBucket(bucket: string) {
+    const exists = await this.client.bucketExists(bucket).catch(() => false);
+    if (!exists) {
+      await this.client.makeBucket(bucket);
+    }
+  }
+
+  async uploadBuffer(bucket: string, key: string, buffer: Buffer, metadata?: Record<string, string>) {
+    await this.ensureBucket(bucket);
+    return this.client.putObject(bucket, key, buffer, buffer.length, metadata || {});
   }
 
   async download(bucket: string, key: string): Promise<Buffer> {
