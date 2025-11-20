@@ -1,0 +1,19 @@
+{
+  "name": "document-classifier",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build:storage": "pnpm --filter @doc-clf/storage build",
+    "build:backend": "pnpm build:storage && pnpm --filter backend build",
+    "build:pipeline": "pnpm build:storage && pnpm --filter pipeline build",
+    "dev:api": "pnpm build:storage && pnpm --filter backend start:dev",
+    "dev:worker": "pnpm build:storage && pnpm --filter pipeline start:dev",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}

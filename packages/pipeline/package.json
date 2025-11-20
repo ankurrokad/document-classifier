@@ -1,0 +1,24 @@
+{
+  "name": "@doc-clf/pipeline",
+  "version": "1.0.0",
+  "main": "dist/worker.js",
+  "scripts": {
+    "start:dev": "ts-node src/worker.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@doc-clf/storage": "workspace:*",
+    "bullmq": "^4.0.0",
+    "dotenv": "^17.2.3",
+    "minio": "^7.1.0",
+    "mongodb": "^6.0.0",
+    "mongoose": "^7.0.0",
+    "sharp": "^0.33.0",
+    "tesseract.js": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
