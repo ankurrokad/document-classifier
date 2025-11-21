@@ -24,8 +24,9 @@ if (envPath) {
 }
 
 import { Worker } from 'bullmq';
-import mongoose from 'mongoose';
 import { MinioStorage } from '@doc-clf/storage';
+import { DocumentModel, connectMongoDB } from '@doc-clf/dal';
+import { OCRProcessor } from './processors/ocr.processor';
 
 // Validate required environment variables
 const requiredEnvVars = ['MONGO_URI', 'REDIS_HOST', 'REDIS_PORT'];
@@ -44,7 +45,13 @@ if (isNaN(redisPort)) {
   process.exit(1);
 }
 
-mongoose.connect(process.env.MONGO_URI!);
+// Connect to MongoDB and initialize models
+connectMongoDB().catch((err) => {
+  console.error('Failed to connect to MongoDB:', err);
+  process.exit(1);
+});
+
+const documentModel = new DocumentModel();
 const storage = new MinioStorage();
 
 const worker = new Worker(
@@ -53,7 +60,60 @@ const worker = new Worker(
     const { documentId } = job.data;
     console.log('[worker] processing document', documentId);
 
-    // TODO: load PDF from MinIO → OCR → classify → extract → upload artifacts → update Mongo
+    try {
+      // Load document from MongoDB
+      const doc = await documentModel.findById(documentId);
+      
+      if (!doc) {
+        throw new Error(`Document ${documentId} not found`);
+      }
+
+      if (!doc.originalObjectKey) {
+        throw new Error(`Document ${documentId} missing originalObjectKey`);
+      }
+
+      // Update status to processing and log start
+      await documentModel.updateStatus(documentId, 'processing', {
+        step: 'ocr',
+        message: 'Starting OCR processing',
+      });
+
+      // Initialize OCR processor
+      const ocrProcessor = new OCRProcessor(storage);
+
+      // Run OCR processing
+      const ocrResult = await ocrProcessor.process(documentId, doc.originalObjectKey);
+
+      // Log intermediate steps
+      await documentModel.addProcessingLog(documentId, 'ocr', `Downloaded PDF (${doc.originalObjectKey})`);
+      await documentModel.addProcessingLog(documentId, 'ocr', `Converted PDF to ${ocrResult.pageCount} page(s)`);
+
+      // Update document with OCR results
+      await documentModel.updateOCRResults(
+        documentId,
+        ocrResult.rawText,
+        ocrResult.pageCount,
+        ocrResult.confidence
+      );
+
+      console.log(`[worker] OCR complete for document ${documentId}`);
+    } catch (error: any) {
+      console.error(`[worker] Error processing document ${documentId}:`, error);
+
+      // Update document with error status and log
+      try {
+        await documentModel.updateErrorStatus(
+          documentId,
+          'ocr',
+          error.message || String(error)
+        );
+      } catch (updateError) {
+        console.error(`[worker] Failed to update error status for document ${documentId}:`, updateError);
+      }
+
+      // Re-throw error so BullMQ can handle retries
+      throw error;
+    }
   },
   {
     connection: { host: process.env.REDIS_HOST!, port: redisPort },
