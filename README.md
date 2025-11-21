@@ -27,17 +27,20 @@ Healthcare clinics and pharmacies receive hundreds of documents every day. Manua
 
 CDIP is an intelligent document processing pipeline designed for healthcare environments. It automatically:
 
-- **Reads** documents using OCR (Optical Character Recognition)
-- **Classifies** document types (prescriptions, lab reports, clinical notes)
-- **Extracts** structured data (patient names, health card numbers, medications, etc.)
-- **Matches** documents to the correct patient records
+- **Reads** documents using PDF text extraction (pdfjs-dist) and OCR (planned for scanned documents)
+- **Classifies** document types (prescriptions, lab reports, clinical notes) using rule-based keyword matching
+- **Extracts** structured data (patient names, health card numbers, medications, provider info, dates, etc.)
+- **Matches** documents to the correct patient records using health card numbers and fuzzy name/DOB matching
 - **Stores** everything in a searchable, organized format
+- **Monitors** system health and performance with a real-time metrics dashboard
 
 Built with a **production-ready architecture** featuring:
 - Stateless backend API
 - Queue-based processing for scalability
 - Object storage for files
 - Metadata in MongoDB for fast queries
+- Real-time metrics dashboard and monitoring
+- Complete document processing pipeline (OCR, classification, extraction, matching)
 
 ---
 
@@ -51,9 +54,10 @@ Built with a **production-ready architecture** featuring:
 
 ### Processing & Queue
 - **BullMQ** - Job queue system
-- **Redis** - Queue backend
-- **Tesseract.js** - OCR engine
-- **Sharp** - Image processing
+- **Redis** - Queue backend and metrics pub/sub
+- **pdfjs-dist** - PDF text extraction
+- **Tesseract.js** - OCR engine (for scanned documents - planned)
+- **Sharp** - Image processing (planned)
 
 ### Storage
 - **MinIO** - S3-compatible object storage
@@ -61,6 +65,12 @@ Built with a **production-ready architecture** featuring:
 ### Architecture
 - **pnpm workspaces** - Monorepo management
 - **Docker Compose** - MinIO container orchestration
+- **Socket.IO** - WebSocket server for real-time metrics
+
+### Monitoring & Metrics
+- **Real-time Dashboard** - Live metrics visualization
+- **WebSocket Gateway** - Real-time updates
+- **Metrics API** - Programmatic access to system metrics
 
 ---
 
@@ -234,6 +244,7 @@ Worker started...
 ### 3. Verify Everything is Running
 
 - **API**: Visit `http://localhost:3000` (should respond or show 404 for unknown routes)
+- **Metrics Dashboard**: Visit `http://localhost:3000/dashboard` (real-time monitoring dashboard)
 - **MinIO Console**: Visit `http://localhost:9001` (login with `minioadmin` / `minioadmin123`)
 - **MongoDB Atlas**: Check your Atlas dashboard to verify cluster is running
 - **Redis**: Run `redis-cli ping` (should return `PONG`)
@@ -249,20 +260,32 @@ document-classifier/
 │   │   ├── src/
 │   │   │   ├── modules/
 │   │   │   │   ├── documents/    # Document upload & retrieval
-│   │   │   │   └── patients/      # Patient management
-│   │   │   └── schemas/           # MongoDB schemas
+│   │   │   │   ├── patients/     # Patient management
+│   │   │   │   └── metrics/      # Metrics dashboard & monitoring
+│   │   │   └── schemas/           # MongoDB schemas (legacy, using DAL now)
 │   │   └── package.json
 │   │
 │   ├── pipeline/            # Worker processes
 │   │   ├── src/
 │   │   │   ├── processors/        # Pipeline stage processors
+│   │   │   │   ├── ocr.processor.ts
+│   │   │   │   ├── classify.processor.ts
+│   │   │   │   ├── extract.processor.ts
+│   │   │   │   └── match.processor.ts
+│   │   │   ├── metrics/           # Metrics reporting
 │   │   │   └── worker.ts          # BullMQ worker
 │   │   └── package.json
 │   │
 │   ├── libs/
-│   │   └── storage/         # Shared MinIO client
+│   │   ├── storage/         # Shared MinIO client
+│   │   │   ├── src/
+│   │   │   │   └── minio.client.ts
+│   │   │   └── package.json
+│   │   └── dal/             # Data Access Layer
 │   │       ├── src/
-│   │       │   └── minio.client.ts
+│   │       │   ├── schemas/       # MongoDB schemas
+│   │       │   ├── models/        # Data models
+│   │       │   └── connection.ts
 │   │       └── package.json
 │   │
 │   └── synth-data/          # Synthetic data generator
@@ -281,7 +304,9 @@ document-classifier/
 
 ## API Endpoints
 
-### Upload Document
+### Document Endpoints
+
+#### Upload Document
 
 Upload a PDF document for processing.
 
@@ -299,9 +324,9 @@ curl -X POST http://localhost:3000/documents \
 }
 ```
 
-### Get Document Status
+#### Get Document
 
-Retrieve document details and processing status.
+Retrieve a single document by ID with full details.
 
 ```bash
 GET /documents/:id
@@ -309,16 +334,167 @@ GET /documents/:id
 # Using curl
 curl http://localhost:3000/documents/507f1f77bcf86cd799439011
 
-# Response (when implemented)
+# Response
 {
   "_id": "507f1f77bcf86cd799439011",
-  "status": "processing",
+  "status": "completed",
   "originalObjectKey": "documents/original/507f1f77bcf86cd799439011.pdf",
+  "classification": {
+    "label": "prescription",
+    "confidence": 85
+  },
+  "extractedData": {
+    "patientName": "John Doe",
+    "healthCard": "1234567890",
+    "dob": "1990-01-01T00:00:00.000Z",
+    "medications": [...]
+  },
+  "matchedPatientId": {...},
+  "processingLogs": [...]
+}
+```
+
+#### List Documents
+
+List all documents with pagination and filtering.
+
+```bash
+GET /documents?limit=50&skip=0&status=completed&type=prescription
+
+# Query Parameters:
+# - limit: Number of results (default: 50)
+# - skip: Number of results to skip (default: 0)
+# - status: Filter by status (uploaded, processing, completed, failed)
+# - type: Filter by document type (prescription, lab_report, clinic_note)
+
+# Response
+{
+  "documents": [...],
+  "total": 150,
+  "limit": 50,
+  "skip": 0
+}
+```
+
+### Patient Endpoints
+
+#### List Patients
+
+List all patients with pagination.
+
+```bash
+GET /patients?limit=50&skip=0
+
+# Response
+{
+  "patients": [...],
+  "total": 75,
+  "limit": 50,
+  "skip": 0
+}
+```
+
+#### Get Patient
+
+Retrieve a single patient by ID with associated documents.
+
+```bash
+GET /patients/:id
+
+# Response
+{
+  "_id": "507f1f77bcf86cd799439012",
+  "firstName": "John",
+  "lastName": "Doe",
+  "fullName": "John Doe",
+  "dob": "1990-01-01T00:00:00.000Z",
+  "healthCard": "1234567890",
+  "documents": [...]
+}
+```
+
+#### Create Patient
+
+Create a new patient record.
+
+```bash
+POST /patients
+Content-Type: application/json
+
+# Request Body
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "dob": "1990-01-01",
+  "healthCard": "1234567890"
+}
+
+# Response
+{
+  "_id": "507f1f77bcf86cd799439012",
+  "firstName": "John",
+  "lastName": "Doe",
   ...
 }
 ```
 
-**Note:** Document retrieval and patient endpoints are currently scaffolded but not yet implemented.
+### Metrics Endpoints
+
+#### Metrics Dashboard
+
+Access the real-time metrics dashboard in your browser.
+
+```bash
+GET /dashboard
+```
+
+Visit `http://localhost:3000/dashboard` to see:
+- Queue metrics (waiting, active, completed jobs)
+- Processing metrics (avg time, percentiles, job counts)
+- System metrics (memory, CPU, event loop lag)
+- API metrics (requests per minute, response times)
+- Active worker count
+
+The dashboard uses WebSocket for real-time updates (updates every 2 seconds by default).
+
+#### Metrics API
+
+Get metrics data programmatically.
+
+```bash
+GET /api/metrics
+
+# Response
+{
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "queue": {
+    "waiting": 5,
+    "active": 2,
+    "completed": 150,
+    "failed": 3
+  },
+  "processing": {
+    "avgTime": 8500,
+    "p50": 8000,
+    "p95": 12000,
+    "p99": 15000,
+    "totalProcessed": 150
+  },
+  "system": {
+    "memory": {...},
+    "cpu": {...},
+    "eventLoopLag": 2.5
+  },
+  "api": {
+    "requestsPerMinute": 12.5,
+    "avgResponseTime": 45,
+    "totalRequests": 500
+  },
+  "workers": {
+    "active": 2
+  }
+}
+```
 
 ---
 
@@ -334,10 +510,12 @@ pnpm dev:api          # Start API server in watch mode
 pnpm dev:worker       # Start worker in watch mode
 
 # Build
+pnpm build:dal        # Build DAL library
 pnpm build:storage    # Build storage library
-pnpm build:backend    # Build backend (includes storage)
-pnpm build:pipeline   # Build pipeline (includes storage)
 pnpm build:synth-data # Build synthetic data generator
+pnpm build:backend    # Build backend (includes dependencies)
+pnpm build:pipeline   # Build pipeline (includes dependencies)
+pnpm build:all        # Build all packages
 
 # Data Generation
 pnpm gen:data         # Generate and upload synthetic documents
@@ -415,6 +593,8 @@ Configure the count via `SYNTH_DOC_COUNT` in `.env`.
 |----------|-------------|---------|
 | `SYNTH_UPLOAD_TO_MINIO` | Upload synthetic data to MinIO | `false` |
 | `SYNTH_DOC_COUNT` | Number of synthetic documents to generate | `200` |
+| `METRICS_HISTORY_SIZE` | Maximum number of metrics records to keep in memory | `1000` |
+| `METRICS_UPDATE_INTERVAL` | Dashboard WebSocket update interval (ms) | `2000` |
 
 ### MinIO Bucket Setup
 
@@ -531,12 +711,29 @@ pnpm build:storage
 
 ---
 
-## Next Steps
+## Current Status
 
-- **Complete Pipeline**: Implement OCR, classification, extraction, and matching stages
-- **Add Endpoints**: Implement document retrieval and patient endpoints
-- **Testing**: Add unit and integration tests
-- **Documentation**: Expand API documentation
+### ✅ Completed Features
+
+- **Complete Pipeline**: OCR, classification, extraction, and matching processors
+- **API Endpoints**: Document upload, retrieval, listing, and patient management
+- **Metrics Dashboard**: Real-time monitoring with WebSocket updates
+- **Data Access Layer**: Centralized MongoDB schemas and models
+- **Queue Processing**: Full BullMQ integration with Redis
+
+### 🚧 In Progress
+
+- ML classification model training
+- Processed artifacts storage
+- Enhanced error handling and retry mechanisms
+
+### 📋 Planned
+
+- Tesseract OCR for scanned documents
+- Image preprocessing (deskew, grayscale)
+- Advanced ML models
+- Batch processing optimizations
+- Unit and integration tests
 
 ---
 

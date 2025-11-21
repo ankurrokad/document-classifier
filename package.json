@@ -8,14 +8,17 @@
     "build:dal": "pnpm --filter @doc-clf/dal build",
     "build:storage": "pnpm --filter @doc-clf/storage build",
     "build:synth-data": "pnpm --filter @doc-clf/synth-data build",
-    "build:backend": "pnpm build:dal && pnpm build:storage && pnpm --filter backend build",
-    "build:pipeline": "pnpm build:dal && pnpm build:storage && pnpm --filter pipeline build",
-    "dev:api": "pnpm build:dal && pnpm build:storage && pnpm --filter backend start:dev",
-    "dev:worker": "pnpm build:dal && pnpm build:storage && pnpm --filter pipeline start:dev",
+    "build:backend": "pnpm --filter backend build",
+    "build:pipeline": "pnpm --filter pipeline build",
+    
+    "dev:api": "pnpm --filter backend start:dev",
+    "dev:worker": "pnpm --filter pipeline start:dev",
+    
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
-    "gen:patients": "pnpm build:dal && pnpm --filter @doc-clf/synth-data gen:patients",
-    "gen:documents": "pnpm build:dal && pnpm build:storage && pnpm --filter @doc-clf/synth-data gen:documents"
+    
+    "gen:patients": "pnpm --filter @doc-clf/synth-data gen:patients",
+    "gen:documents": "pnpm --filter @doc-clf/synth-data gen:documents"
 
   },
   "devDependencies": {
