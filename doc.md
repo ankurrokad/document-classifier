@@ -1,13 +1,3 @@
----
-# 📘 **Clinical Document Intelligence Pipeline (CDIP)**
-
-**Author:** Ankur Rokad  
-**Version:** MVP v1.1  
-**Date:** 2025  
-**Tech Stack:** Node.js, TypeScript, NestJS, MongoDB, Redis, BullMQ, MinIO, Tesseract
-
----
-
 # 1. **What Is This Project?**
 
 Healthcare clinics and pharmacies receive dozens–hundreds of documents daily (fax/email). Staff manually review, classify, and attach them to patient charts — a slow, error-prone workflow.
