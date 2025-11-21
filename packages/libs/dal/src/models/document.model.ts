@@ -135,6 +135,102 @@ export class DocumentModel {
   }
 
   /**
+   * Update classification results
+   */
+  async updateClassification(
+    id: string | mongoose.Types.ObjectId,
+    label: string,
+    confidence: number
+  ): Promise<void> {
+    await this.model.updateOne(
+      { _id: id },
+      {
+        status: 'classified',
+        'classification.label': label,
+        'classification.confidence': confidence,
+        $push: {
+          processingLogs: {
+            ts: new Date(),
+            step: 'classification',
+            message: `Classified as ${label} with ${confidence}% confidence`,
+          },
+        },
+      }
+    );
+  }
+
+  /**
+   * Update extracted data and status
+   */
+  async updateExtractedDataAndStatus(
+    id: string | mongoose.Types.ObjectId,
+    extractedData: Partial<IDocument['extracted']>
+  ): Promise<void> {
+    const update: any = {
+      status: 'extracted',
+      $push: {
+        processingLogs: {
+          ts: new Date(),
+          step: 'extraction',
+          message: 'Field extraction complete',
+        },
+      },
+    };
+    Object.keys(extractedData).forEach((key) => {
+      update[`extracted.${key}`] = (extractedData as any)[key];
+    });
+    await this.model.updateOne({ _id: id }, update);
+  }
+
+  /**
+   * Update patient match
+   */
+  async updatePatientMatch(
+    id: string | mongoose.Types.ObjectId,
+    patientId: string | mongoose.Types.ObjectId | null,
+    matchMethod: string,
+    confidence: number
+  ): Promise<void> {
+    const update: any = {
+      status: patientId ? 'matched' : 'unmatched',
+      $push: {
+        processingLogs: {
+          ts: new Date(),
+          step: 'matching',
+          message: patientId
+            ? `Matched to patient using ${matchMethod} (${confidence}% confidence)`
+            : 'No patient match found',
+        },
+      },
+    };
+
+    if (patientId) {
+      update.matchedPatientId = patientId;
+    }
+
+    await this.model.updateOne({ _id: id }, update);
+  }
+
+  /**
+   * Mark document as complete
+   */
+  async markComplete(id: string | mongoose.Types.ObjectId): Promise<void> {
+    await this.model.updateOne(
+      { _id: id },
+      {
+        status: 'complete',
+        $push: {
+          processingLogs: {
+            ts: new Date(),
+            step: 'complete',
+            message: 'Document processing complete',
+          },
+        },
+      }
+    );
+  }
+
+  /**
    * Update document with error status
    */
   async updateErrorStatus(

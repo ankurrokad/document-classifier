@@ -40,4 +40,42 @@ export class DocumentsService {
 
     return { documentId: doc._id };
   }
+
+  async findById(id: string) {
+    return await this.docModel.findById(id).populate('matchedPatientId').exec();
+  }
+
+  async findAll(options: {
+    limit?: number;
+    skip?: number;
+    status?: string;
+    type?: string;
+  }) {
+    const query: any = {};
+
+    if (options.status) {
+      query.status = options.status;
+    }
+
+    if (options.type) {
+      query['classification.label'] = options.type;
+    }
+
+    const documents = await this.docModel
+      .find(query)
+      .limit(options.limit || 50)
+      .skip(options.skip || 0)
+      .populate('matchedPatientId')
+      .sort({ _id: -1 })
+      .exec();
+
+    const total = await this.docModel.countDocuments(query);
+
+    return {
+      documents,
+      total,
+      limit: options.limit || 50,
+      skip: options.skip || 0,
+    };
+  }
 }

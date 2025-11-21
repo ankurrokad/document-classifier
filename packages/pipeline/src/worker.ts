@@ -25,8 +25,11 @@ if (envPath) {
 
 import { Worker } from 'bullmq';
 import { MinioStorage } from '@doc-clf/storage';
-import { DocumentModel, connectMongoDB } from '@doc-clf/dal';
+import { DocumentModel, PatientModel, connectMongoDB } from '@doc-clf/dal';
 import { OCRProcessor } from './processors/ocr.processor';
+import { ClassifyProcessor } from './processors/classify.processor';
+import { ExtractProcessor } from './processors/extract.processor';
+import { MatchProcessor } from './processors/match.processor';
 
 // Validate required environment variables
 const requiredEnvVars = ['MONGO_URI', 'REDIS_HOST', 'REDIS_PORT'];
@@ -52,6 +55,7 @@ connectMongoDB().catch((err) => {
 });
 
 const documentModel = new DocumentModel();
+const patientModel = new PatientModel();
 const storage = new MinioStorage();
 
 const worker = new Worker(
@@ -97,6 +101,91 @@ const worker = new Worker(
       );
 
       console.log(`[worker] OCR complete for document ${documentId}`);
+
+      // Stage 2: Classification
+      try {
+        await documentModel.addProcessingLog(documentId, 'classification', 'Starting classification');
+        const classifyProcessor = new ClassifyProcessor();
+        const classification = classifyProcessor.classify(ocrResult.rawText);
+        await documentModel.updateClassification(
+          documentId,
+          classification.label,
+          classification.confidence
+        );
+        console.log(`[worker] Classified document ${documentId} as ${classification.label}`);
+      } catch (error: any) {
+        console.error(`[worker] Classification error for document ${documentId}:`, error);
+        await documentModel.updateErrorStatus(
+          documentId,
+          'classification',
+          error.message || String(error)
+        );
+        // Continue pipeline even if classification fails
+      }
+
+      // Stage 3: Extraction
+      try {
+        // Get the document again to get classification
+        const docWithClassification = await documentModel.findById(documentId);
+        const docType = docWithClassification?.classification?.label || 'unknown';
+
+        await documentModel.addProcessingLog(documentId, 'extraction', 'Starting field extraction');
+        const extractProcessor = new ExtractProcessor();
+        const extractedData = extractProcessor.extract(ocrResult.rawText, docType);
+        
+        // Preserve rawText from OCR
+        extractedData.rawText = ocrResult.rawText;
+        
+        await documentModel.updateExtractedDataAndStatus(documentId, extractedData);
+        console.log(`[worker] Extracted fields for document ${documentId}`);
+      } catch (error: any) {
+        console.error(`[worker] Extraction error for document ${documentId}:`, error);
+        await documentModel.updateErrorStatus(
+          documentId,
+          'extraction',
+          error.message || String(error)
+        );
+        // Continue pipeline even if extraction fails
+      }
+
+      // Stage 4: Patient Matching
+      try {
+        // Get the document again to get extracted data
+        const docWithExtracted = await documentModel.findById(documentId);
+        
+        if (docWithExtracted?.extracted) {
+          await documentModel.addProcessingLog(documentId, 'matching', 'Starting patient matching');
+          const matchProcessor = new MatchProcessor(patientModel);
+          const matchResult = await matchProcessor.match(docWithExtracted.extracted);
+          
+          await documentModel.updatePatientMatch(
+            documentId,
+            matchResult.patientId,
+            matchResult.matchMethod,
+            matchResult.confidence
+          );
+
+          // If patient matched, add document to patient's documents array
+          if (matchResult.patientId) {
+            await patientModel.addDocument(matchResult.patientId, documentId);
+            console.log(`[worker] Matched document ${documentId} to patient ${matchResult.patientId}`);
+          } else {
+            console.log(`[worker] No patient match found for document ${documentId}`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`[worker] Matching error for document ${documentId}:`, error);
+        await documentModel.updateErrorStatus(
+          documentId,
+          'matching',
+          error.message || String(error)
+        );
+        // Continue pipeline even if matching fails
+      }
+
+      // Stage 5: Mark as complete
+      await documentModel.markComplete(documentId);
+      console.log(`[worker] Processing complete for document ${documentId}`);
     } catch (error: any) {
       console.error(`[worker] Error processing document ${documentId}:`, error);
 
