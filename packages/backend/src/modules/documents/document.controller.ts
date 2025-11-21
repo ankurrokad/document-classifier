@@ -12,13 +12,9 @@ export class DocumentsController {
     return this.docs.handleUpload(file);
   }
 
-  @Get(':id')
-  async getDocument(@Param('id') id: string) {
-    const document = await this.docs.findById(id);
-    if (!document) {
-      throw new NotFoundException(`Document with ID ${id} not found`);
-    }
-    return document;
+  @Get('health/quick')
+  quickHealth() {
+    return { status: 'ok', timestamp: Date.now() };
   }
 
   @Get()
@@ -34,6 +30,15 @@ export class DocumentsController {
       status,
       type,
     });
+  }
+
+  @Get(':id')
+  async getDocument(@Param('id') id: string) {
+    const document = await this.docs.findById(id);
+    if (!document) {
+      throw new NotFoundException(`Document with ID ${id} not found`);
+    }
+    return document;
   }
 }
 

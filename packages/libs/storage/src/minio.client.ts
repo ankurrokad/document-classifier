@@ -82,5 +82,21 @@ export class MinioStorage {
       stream.on('error', reject);
     });
   }
+
+  async listObjects(bucket: string, prefix?: string): Promise<string[]> {
+    await this.ensureBucket(bucket);
+    const objects: string[] = [];
+    const stream = this.client.listObjects(bucket, prefix || '', true);
+    
+    return new Promise((resolve, reject) => {
+      stream.on('data', (obj: any) => {
+        if (obj.name && obj.name.endsWith('.pdf')) {
+          objects.push(obj.name);
+        }
+      });
+      stream.on('end', () => resolve(objects));
+      stream.on('error', reject);
+    });
+  }
 }
 

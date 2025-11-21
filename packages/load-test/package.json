@@ -1,0 +1,22 @@
+{
+  "name": "@doc-clf/load-test",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/cli.ts"
+  },
+  "dependencies": {
+    "@doc-clf/storage": "workspace:*",
+    "axios": "^1.6.0",
+    "dotenv": "^17.2.3",
+    "form-data": "^4.0.0",
+    "p-limit": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.0"
+  }
+}
+

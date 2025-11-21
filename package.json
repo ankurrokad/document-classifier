@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "build": "pnpm build:all",
-    "build:all": "pnpm build:dal && pnpm build:storage && pnpm build:synth-data && pnpm build:backend && pnpm build:pipeline",
+    "build:all": "pnpm build:dal && pnpm build:storage && pnpm build:synth-data && pnpm build:backend && pnpm build:pipeline && pnpm build:load-test",
     "build:dal": "pnpm --filter @doc-clf/dal build",
     "build:storage": "pnpm --filter @doc-clf/storage build",
     "build:synth-data": "pnpm --filter @doc-clf/synth-data build",
@@ -18,7 +18,10 @@
     "format": "prettier --write .",
     
     "gen:patients": "pnpm --filter @doc-clf/synth-data gen:patients",
-    "gen:documents": "pnpm --filter @doc-clf/synth-data gen:documents"
+    "gen:documents": "pnpm --filter @doc-clf/synth-data gen:documents",
+    
+    "test:load": "pnpm --filter @doc-clf/load-test start",
+    "build:load-test": "pnpm --filter @doc-clf/load-test build"
 
   },
   "devDependencies": {

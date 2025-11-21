@@ -117,6 +117,90 @@
       transform: translateY(-1px);
     }
     
+    .metric-card.warning {
+      border-color: rgba(251, 191, 36, 0.5);
+      background: rgba(251, 191, 36, 0.05);
+    }
+    
+    .metric-card.critical {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: rgba(239, 68, 68, 0.05);
+    }
+    
+    .metric-card.healthy {
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+    
+    .health-section {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 32px;
+    }
+    
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    
+    .health-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 6px;
+    }
+    
+    .health-label {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .health-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    
+    .health-status.healthy {
+      color: #22c55e;
+    }
+    
+    .health-status.warning {
+      color: #fbbf24;
+    }
+    
+    .health-status.critical {
+      color: #ef4444;
+    }
+    
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .health-dot.healthy {
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+    }
+    
+    .health-dot.warning {
+      background: #fbbf24;
+      box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+    }
+    
+    .health-dot.critical {
+      background: #ef4444;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    }
+    
     .metric-label {
       font-size: 12px;
       color: rgba(255, 255, 255, 0.5);
@@ -182,6 +266,47 @@
     </div>
     
     <div id="error" class="error"></div>
+    
+    <div class="health-section">
+      <div class="section-title">Performance Health</div>
+      <div class="health-grid">
+        <div class="health-item">
+          <span class="health-label">Event Loop</span>
+          <span id="health-eventloop" class="health-status">
+            <span class="health-dot"></span>
+            <span>Checking...</span>
+          </span>
+        </div>
+        <div class="health-item">
+          <span class="health-label">API Response Time</span>
+          <span id="health-api" class="health-status">
+            <span class="health-dot"></span>
+            <span>Checking...</span>
+          </span>
+        </div>
+        <div class="health-item">
+          <span class="health-label">Queue Depth</span>
+          <span id="health-queue" class="health-status">
+            <span class="health-dot"></span>
+            <span>Checking...</span>
+          </span>
+        </div>
+        <div class="health-item">
+          <span class="health-label">CPU Usage</span>
+          <span id="health-cpu" class="health-status">
+            <span class="health-dot"></span>
+            <span>Checking...</span>
+          </span>
+        </div>
+        <div class="health-item">
+          <span class="health-label">User Experience</span>
+          <span id="health-ux" class="health-status">
+            <span class="health-dot"></span>
+            <span>Checking...</span>
+          </span>
+        </div>
+      </div>
+    </div>
     
     <div class="section">
       <div class="section-title">Queue</div>
@@ -329,8 +454,98 @@
       document.getElementById('api-avg-time').innerHTML = formatNumber(data.api.avgResponseTime) + '<span class="metric-unit">ms</span>';
       document.getElementById('api-total').textContent = formatNumber(data.api.totalRequests);
       
+      // Update health indicators
+      updateHealthIndicators(data);
+      
+      // Color code critical metrics
+      updateMetricColors(data);
+      
       // Timestamp
       document.getElementById('timestamp').textContent = 'Last update: ' + new Date(data.timestamp).toLocaleTimeString();
+    }
+    
+    function updateHealthIndicators(data) {
+      // Event Loop Lag
+      const eventLoopLag = data.system.eventLoopLag || 0;
+      const eventLoopHealth = eventLoopLag < 10 ? 'healthy' : eventLoopLag < 50 ? 'warning' : 'critical';
+      const eventLoopText = eventLoopLag < 10 ? 'Healthy' : eventLoopLag < 50 ? 'Elevated' : 'Critical';
+      document.getElementById('health-eventloop').className = 'health-status ' + eventLoopHealth;
+      document.getElementById('health-eventloop').innerHTML = '<span class="health-dot ' + eventLoopHealth + '"></span><span>' + eventLoopText + ' (' + formatNumber(eventLoopLag) + 'ms)</span>';
+      
+      // API Response Time
+      const apiResponseTime = data.api.avgResponseTime || 0;
+      const apiHealth = apiResponseTime < 200 ? 'healthy' : apiResponseTime < 500 ? 'warning' : 'critical';
+      const apiText = apiResponseTime < 200 ? 'Fast' : apiResponseTime < 500 ? 'Moderate' : 'Slow';
+      document.getElementById('health-api').className = 'health-status ' + apiHealth;
+      document.getElementById('health-api').innerHTML = '<span class="health-dot ' + apiHealth + '"></span><span>' + apiText + ' (' + formatNumber(apiResponseTime) + 'ms)</span>';
+      
+      // Queue Depth
+      const queueWaiting = data.queue.waiting || 0;
+      const queueHealth = queueWaiting < 10 ? 'healthy' : queueWaiting < 30 ? 'warning' : 'critical';
+      const queueText = queueWaiting < 10 ? 'Normal' : queueWaiting < 30 ? 'Backlogged' : 'Overloaded';
+      document.getElementById('health-queue').className = 'health-status ' + queueHealth;
+      document.getElementById('health-queue').innerHTML = '<span class="health-dot ' + queueHealth + '"></span><span>' + queueText + ' (' + formatNumber(queueWaiting) + ')</span>';
+      
+      // CPU Usage
+      const cpuUsage = data.system.cpu || 0;
+      const cpuHealth = cpuUsage < 70 ? 'healthy' : cpuUsage < 85 ? 'warning' : 'critical';
+      const cpuText = cpuUsage < 70 ? 'Normal' : cpuUsage < 85 ? 'High' : 'Critical';
+      document.getElementById('health-cpu').className = 'health-status ' + cpuHealth;
+      document.getElementById('health-cpu').innerHTML = '<span class="health-dot ' + cpuHealth + '"></span><span>' + cpuText + ' (' + formatNumber(cpuUsage) + '%)</span>';
+      
+      // Overall User Experience
+      const uxScore = calculateUXScore(data);
+      const uxHealth = uxScore >= 80 ? 'healthy' : uxScore >= 60 ? 'warning' : 'critical';
+      const uxText = uxScore >= 80 ? 'Good' : uxScore >= 60 ? 'Fair' : 'Poor';
+      document.getElementById('health-ux').className = 'health-status ' + uxHealth;
+      document.getElementById('health-ux').innerHTML = '<span class="health-dot ' + uxHealth + '"></span><span>' + uxText + ' (' + uxScore + '/100)</span>';
+    }
+    
+    function calculateUXScore(data) {
+      let score = 100;
+      
+      // Event loop lag penalty (max -30 points)
+      const eventLoopLag = data.system.eventLoopLag || 0;
+      if (eventLoopLag > 100) score -= 30;
+      else if (eventLoopLag > 50) score -= 15;
+      else if (eventLoopLag > 10) score -= 5;
+      
+      // API response time penalty (max -30 points)
+      const apiResponseTime = data.api.avgResponseTime || 0;
+      if (apiResponseTime > 1000) score -= 30;
+      else if (apiResponseTime > 500) score -= 15;
+      else if (apiResponseTime > 200) score -= 5;
+      
+      // Queue depth penalty (max -20 points)
+      const queueWaiting = data.queue.waiting || 0;
+      if (queueWaiting > 50) score -= 20;
+      else if (queueWaiting > 30) score -= 10;
+      else if (queueWaiting > 10) score -= 5;
+      
+      // CPU usage penalty (max -20 points)
+      const cpuUsage = data.system.cpu || 0;
+      if (cpuUsage > 90) score -= 20;
+      else if (cpuUsage > 80) score -= 10;
+      else if (cpuUsage > 70) score -= 5;
+      
+      return Math.max(0, Math.min(100, score));
+    }
+    
+    function updateMetricColors(data) {
+      // Event loop lag
+      const eventLoopCard = document.getElementById('sys-eventloop').closest('.metric-card');
+      const eventLoopLag = data.system.eventLoopLag || 0;
+      eventLoopCard.className = 'metric-card' + (eventLoopLag > 50 ? ' critical' : eventLoopLag > 10 ? ' warning' : ' healthy');
+      
+      // API response time
+      const apiResponseCard = document.getElementById('api-avg-time').closest('.metric-card');
+      const apiResponseTime = data.api.avgResponseTime || 0;
+      apiResponseCard.className = 'metric-card' + (apiResponseTime > 500 ? ' critical' : apiResponseTime > 200 ? ' warning' : ' healthy');
+      
+      // Queue waiting
+      const queueWaitingCard = document.getElementById('queue-waiting').closest('.metric-card');
+      const queueWaiting = data.queue.waiting || 0;
+      queueWaitingCard.className = 'metric-card' + (queueWaiting > 30 ? ' critical' : queueWaiting > 10 ? ' warning' : ' healthy');
     }
     
     socket.on('connect', () => {
