@@ -14,7 +14,8 @@
     "dev:worker": "pnpm build:dal && pnpm build:storage && pnpm --filter pipeline start:dev",
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
-    "gen:data": "pnpm build:storage && pnpm --filter @doc-clf/synth-data gen"
+    "gen:patients": "pnpm build:dal && pnpm --filter @doc-clf/synth-data gen:patients",
+    "gen:documents": "pnpm build:dal && pnpm build:storage && pnpm --filter @doc-clf/synth-data gen:documents"
 
   },
   "devDependencies": {

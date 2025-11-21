@@ -138,6 +138,9 @@ importers:
 
   packages/synth-data:
     dependencies:
+      '@doc-clf/dal':
+        specifier: workspace:*
+        version: link:../libs/dal
       '@doc-clf/storage':
         specifier: workspace:*
         version: link:../libs/storage
