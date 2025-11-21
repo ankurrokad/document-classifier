@@ -24,8 +24,12 @@ if (envPath) {
 }
 
 import { Worker } from 'bullmq';
-import mongoose from 'mongoose';
 import { MinioStorage } from '@doc-clf/storage';
+import { DocumentModel, PatientModel, connectMongoDB } from '@doc-clf/dal';
+import { OCRProcessor } from './processors/ocr.processor';
+import { ClassifyProcessor } from './processors/classify.processor';
+import { ExtractProcessor } from './processors/extract.processor';
+import { MatchProcessor } from './processors/match.processor';
 
 // Validate required environment variables
 const requiredEnvVars = ['MONGO_URI', 'REDIS_HOST', 'REDIS_PORT'];
@@ -44,7 +48,14 @@ if (isNaN(redisPort)) {
   process.exit(1);
 }
 
-mongoose.connect(process.env.MONGO_URI!);
+// Connect to MongoDB and initialize models
+connectMongoDB().catch((err) => {
+  console.error('Failed to connect to MongoDB:', err);
+  process.exit(1);
+});
+
+const documentModel = new DocumentModel();
+const patientModel = new PatientModel();
 const storage = new MinioStorage();
 
 const worker = new Worker(
@@ -53,7 +64,145 @@ const worker = new Worker(
     const { documentId } = job.data;
     console.log('[worker] processing document', documentId);
 
-    // TODO: load PDF from MinIO → OCR → classify → extract → upload artifacts → update Mongo
+    try {
+      // Load document from MongoDB
+      const doc = await documentModel.findById(documentId);
+      
+      if (!doc) {
+        throw new Error(`Document ${documentId} not found`);
+      }
+
+      if (!doc.originalObjectKey) {
+        throw new Error(`Document ${documentId} missing originalObjectKey`);
+      }
+
+      // Update status to processing and log start
+      await documentModel.updateStatus(documentId, 'processing', {
+        step: 'ocr',
+        message: 'Starting OCR processing',
+      });
+
+      // Initialize OCR processor
+      const ocrProcessor = new OCRProcessor(storage);
+
+      // Run OCR processing
+      const ocrResult = await ocrProcessor.process(documentId, doc.originalObjectKey);
+
+      // Log intermediate steps
+      await documentModel.addProcessingLog(documentId, 'ocr', `Downloaded PDF (${doc.originalObjectKey})`);
+      await documentModel.addProcessingLog(documentId, 'ocr', `Converted PDF to ${ocrResult.pageCount} page(s)`);
+
+      // Update document with OCR results
+      await documentModel.updateOCRResults(
+        documentId,
+        ocrResult.rawText,
+        ocrResult.pageCount,
+        ocrResult.confidence
+      );
+
+      console.log(`[worker] OCR complete for document ${documentId}`);
+
+      // Stage 2: Classification
+      try {
+        await documentModel.addProcessingLog(documentId, 'classification', 'Starting classification');
+        const classifyProcessor = new ClassifyProcessor();
+        const classification = classifyProcessor.classify(ocrResult.rawText);
+        await documentModel.updateClassification(
+          documentId,
+          classification.label,
+          classification.confidence
+        );
+        console.log(`[worker] Classified document ${documentId} as ${classification.label}`);
+      } catch (error: any) {
+        console.error(`[worker] Classification error for document ${documentId}:`, error);
+        await documentModel.updateErrorStatus(
+          documentId,
+          'classification',
+          error.message || String(error)
+        );
+        // Continue pipeline even if classification fails
+      }
+
+      // Stage 3: Extraction
+      try {
+        // Get the document again to get classification
+        const docWithClassification = await documentModel.findById(documentId);
+        const docType = docWithClassification?.classification?.label || 'unknown';
+
+        await documentModel.addProcessingLog(documentId, 'extraction', 'Starting field extraction');
+        const extractProcessor = new ExtractProcessor();
+        const extractedData = extractProcessor.extract(ocrResult.rawText, docType);
+        
+        // Preserve rawText from OCR
+        extractedData.rawText = ocrResult.rawText;
+        
+        await documentModel.updateExtractedDataAndStatus(documentId, extractedData);
+        console.log(`[worker] Extracted fields for document ${documentId}`);
+      } catch (error: any) {
+        console.error(`[worker] Extraction error for document ${documentId}:`, error);
+        await documentModel.updateErrorStatus(
+          documentId,
+          'extraction',
+          error.message || String(error)
+        );
+        // Continue pipeline even if extraction fails
+      }
+
+      // Stage 4: Patient Matching
+      try {
+        // Get the document again to get extracted data
+        const docWithExtracted = await documentModel.findById(documentId);
+        
+        if (docWithExtracted?.extracted) {
+          await documentModel.addProcessingLog(documentId, 'matching', 'Starting patient matching');
+          const matchProcessor = new MatchProcessor(patientModel);
+          const matchResult = await matchProcessor.match(docWithExtracted.extracted);
+          
+          await documentModel.updatePatientMatch(
+            documentId,
+            matchResult.patientId,
+            matchResult.matchMethod,
+            matchResult.confidence
+          );
+
+          // If patient matched, add document to patient's documents array
+          if (matchResult.patientId) {
+            await patientModel.addDocument(matchResult.patientId, documentId);
+            console.log(`[worker] Matched document ${documentId} to patient ${matchResult.patientId}`);
+          } else {
+            console.log(`[worker] No patient match found for document ${documentId}`);
+          }
+        }
+      } catch (error: any) {
+        console.error(`[worker] Matching error for document ${documentId}:`, error);
+        await documentModel.updateErrorStatus(
+          documentId,
+          'matching',
+          error.message || String(error)
+        );
+        // Continue pipeline even if matching fails
+      }
+
+      // Stage 5: Mark as complete
+      await documentModel.markComplete(documentId);
+      console.log(`[worker] Processing complete for document ${documentId}`);
+    } catch (error: any) {
+      console.error(`[worker] Error processing document ${documentId}:`, error);
+
+      // Update document with error status and log
+      try {
+        await documentModel.updateErrorStatus(
+          documentId,
+          'ocr',
+          error.message || String(error)
+        );
+      } catch (updateError) {
+        console.error(`[worker] Failed to update error status for document ${documentId}:`, updateError);
+      }
+
+      // Re-throw error so BullMQ can handle retries
+      throw error;
+    }
   },
   {
     connection: { host: process.env.REDIS_HOST!, port: redisPort },

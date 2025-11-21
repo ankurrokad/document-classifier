@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DocumentsController } from './document.controller';
 import { DocumentsService } from './document.service';
-import { DocumentSchema } from '../../schemas/document.schema';
+import { DocumentSchema } from '@doc-clf/dal';
 import { MinioStorage } from '@doc-clf/storage';
 
 @Module({
