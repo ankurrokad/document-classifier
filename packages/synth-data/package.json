@@ -4,11 +4,11 @@
     "private": true,
     "scripts": {
       "build": "tsc",
-      "start": "node dist/generate.js",
-      "start:dev": "ts-node ./src/generate.ts",
-      "gen": "ts-node ./src/generate.ts"
+      "gen:patients": "ts-node ./src/generate-patients.ts",
+      "gen:documents": "ts-node ./src/generate-documents.ts"
     },
     "dependencies": {
+      "@doc-clf/dal": "workspace:*",
       "@doc-clf/storage": "workspace:*",
       "@faker-js/faker": "^8.0.0",
       "dotenv": "^17.2.3",
