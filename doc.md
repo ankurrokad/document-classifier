@@ -31,11 +31,12 @@ Store Results → Update Status → Done!
 
 ## Key Features
 
-- **Automated Classification** - Instantly identifies document types using rule-based and ML approaches
-- **Intelligent Extraction** - Pulls out patient names, health card numbers, medications, provider info, and dates
-- **Smart Patient Matching** - Automatically links documents to the correct patient using health card numbers and fuzzy name matching
+- **Automated Classification** - Instantly identifies document types using rule-based keyword matching (ML models planned)
+- **Intelligent Extraction** - Pulls out patient names, health card numbers, medications, provider info, and dates using regex-based extraction
+- **Smart Patient Matching** - Automatically links documents to the correct patient using health card numbers (exact match) and fuzzy name/DOB matching
 - **Queue-Based Processing** - Handles high volumes with scalable worker architecture
-- **Production-Ready Architecture** - Stateless backend, object storage, metadata in database
+- **Real-Time Monitoring** - Live metrics dashboard with WebSocket updates showing queue status, processing times, system health, and API performance
+- **Production-Ready Architecture** - Stateless backend, object storage, metadata in database, comprehensive monitoring
 
 ---
 
@@ -44,7 +45,8 @@ Store Results → Update Status → Done!
 ```
                     +-----------------------------+
                     |        REST API (NestJS)     |
-                    |  Upload & Status Endpoints  |
+                    |  Upload, Status, Metrics    |
+                    |  Patient & Document APIs    |
                     +-------------+---------------+
                                   |
                                   | (1) Upload PDF to storage
@@ -83,8 +85,14 @@ Store Results → Update Status → Done!
     PDF from Storage  (Tesseract)   (rules + ML)      + Matching
           |
           v
-    Upload processed artifacts → Update MongoDB → Done!
+    Upload processed artifacts → Update MongoDB → Report Metrics → Done!
 ```
+
+**Metrics & Monitoring:**
+- Real-time dashboard at `/dashboard` with live WebSocket updates
+- API endpoint at `/api/metrics` for programmatic access
+- Tracks queue status, processing times, system health, and API performance
+- Metrics interceptor automatically tracks all API requests
 
 **Architecture Principles:**
 - **Stateless Backend** - No file storage on server disk
@@ -102,20 +110,23 @@ Store Results → Update Status → Done!
 - **MongoDB** - Document database for metadata and patient records
 
 ## Processing & AI
-- **Tesseract.js** - OCR engine for text extraction
+- **pdfjs-dist** - PDF text extraction for text-based PDFs
+- **Tesseract.js** - OCR engine for scanned documents (planned)
 - **BullMQ** - Job queue for distributed processing
-- **Redis** - Queue backend and caching
+- **Redis** - Queue backend, caching, and metrics pub/sub
 
 ## Storage & Infrastructure
 - **MinIO** - S3-compatible object storage (Docker) - replaceable with AWS S3, GCP, Azure
 - **MongoDB Atlas** - Cloud-hosted MongoDB database
-- **Redis** - Local Redis instance for queue backend
+- **Redis** - Local Redis instance for queue backend and metrics pub/sub
+- **Socket.IO** - WebSocket server for real-time metrics updates
 
 ## Architecture
-- **Monorepo** - pnpm workspace with 4 packages:
+- **Monorepo** - pnpm workspace with 5 packages:
   - `@doc-clf/backend` - NestJS API server
   - `@doc-clf/pipeline` - Worker processes
   - `@doc-clf/storage` - Shared storage utilities
+  - `@doc-clf/dal` - Data Access Layer (MongoDB schemas and models)
   - `@doc-clf/synth-data` - Synthetic data generator
 
 ---
@@ -150,25 +161,41 @@ From each document, the system extracts:
 - Monorepo structure and package organization
 - MinIO storage integration
 - Document upload API endpoint
-- MongoDB document schema
+- MongoDB document schema and DAL (Data Access Layer)
 - Queue infrastructure (BullMQ + Redis)
-- Worker skeleton and architecture
+- Complete pipeline processors:
+  - **OCR Processor** - PDF text extraction using pdfjs-dist
+  - **Classification Processor** - Rule-based document type classification
+  - **Extraction Processor** - Field extraction (patient name, health card, DOB, medications, provider)
+  - **Match Processor** - Patient matching via health card and fuzzy name/DOB matching
+- Worker architecture with full pipeline execution
+- Patient management endpoints (list, get, create)
+- Document retrieval endpoints (list, get with filtering)
+- **Metrics & Monitoring System**:
+  - Real-time metrics dashboard (`/dashboard`)
+  - WebSocket gateway for live updates
+  - API metrics tracking (request rates, response times)
+  - Queue metrics (waiting, active, completed jobs)
+  - System metrics (memory, CPU, event loop lag)
+  - Processing metrics (avg time, percentiles, job counts)
 - Synthetic data generator for testing
 - Infrastructure setup (MinIO via Docker Compose, MongoDB Atlas, local Redis)
 
 ## 🚧 In Progress
 
-- Pipeline processors (OCR, classification, extraction, matching)
-- Patient schema and endpoints
-- Document retrieval endpoints
+- ML classification model training (currently using rule-based)
+- Processed artifacts storage (OCR results, extracted data)
+- Batch testing and optimization
+- Enhanced patient matching confidence scoring
 
 ## 📋 Planned
 
-- Complete all 8 pipeline stages
-- ML classification model training
-- Patient matching algorithm
-- Processed artifacts storage
-- Batch testing and optimization
+- Advanced ML classification models
+- Image preprocessing for scanned documents (deskew, grayscale)
+- Tesseract OCR integration for scanned PDFs
+- Processed artifacts storage in MinIO
+- Batch processing optimizations
+- Error recovery and retry mechanisms
 
 ---
 
@@ -176,30 +203,38 @@ From each document, the system extracts:
 
 ## Immediate Next Steps
 
-1. **Complete OCR Pipeline**
-   - Implement PDF download from MinIO
-   - Add image preprocessing (deskew, grayscale)
-   - Integrate Tesseract OCR
+1. **Enhance OCR Pipeline**
+   - Add image preprocessing for scanned documents (deskew, grayscale)
+   - Integrate Tesseract OCR for scanned PDFs (currently using pdfjs-dist for text-based PDFs)
+   - Improve OCR confidence scoring
 
-2. **Build Classification System**
-   - Rule-based classification (keywords, patterns)
+2. **Improve Classification System**
    - Train ML model on synthetic dataset
-   - Implement confidence scoring
+   - Enhance rule-based patterns
+   - Implement multi-classifier ensemble approach
 
-3. **Field Extraction**
-   - Regex-based extraction for structured fields
-   - Patient name, health card, DOB parsing
-   - Medication extraction for prescriptions
+3. **Enhance Field Extraction**
+   - Improve regex patterns for better accuracy
+   - Add extraction for lab values (for lab reports)
+   - Extract clinical notes (for clinic notes)
+   - Handle edge cases and variations
 
-4. **Patient Matching**
-   - Health card exact matching
-   - Name + DOB fuzzy matching
-   - Similarity threshold tuning
+4. **Refine Patient Matching**
+   - Improve fuzzy matching algorithms
+   - Add confidence threshold tuning
+   - Handle partial matches and edge cases
+   - Add match history and audit trail
 
-5. **Complete API**
-   - Document retrieval endpoint
-   - Patient endpoints (list, detail, chart)
-   - Error handling and validation
+5. **Storage & Artifacts**
+   - Store processed artifacts in MinIO
+   - Cache OCR results for reprocessing
+   - Implement artifact versioning
+
+6. **API Enhancements**
+   - Add patient chart endpoint (all documents for a patient)
+   - Add document download endpoint
+   - Implement advanced filtering and search
+   - Add pagination improvements
 
 ## Future Enhancements
 

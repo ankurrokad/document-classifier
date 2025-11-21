@@ -30,6 +30,7 @@ import { OCRProcessor } from './processors/ocr.processor';
 import { ClassifyProcessor } from './processors/classify.processor';
 import { ExtractProcessor } from './processors/extract.processor';
 import { MatchProcessor } from './processors/match.processor';
+import { MetricsReporter } from './metrics/metrics-reporter';
 
 // Validate required environment variables
 const requiredEnvVars = ['MONGO_URI', 'REDIS_HOST', 'REDIS_PORT'];
@@ -57,14 +58,18 @@ connectMongoDB().catch((err) => {
 const documentModel = new DocumentModel();
 const patientModel = new PatientModel();
 const storage = new MinioStorage();
+const metricsReporter = new MetricsReporter();
 
 const worker = new Worker(
   'doc:process',
   async (job) => {
     const { documentId } = job.data;
+    const jobId = job.id?.toString() || `job-${Date.now()}`;
+    const startTime = Date.now();
     console.log('[worker] processing document', documentId);
 
     try {
+      await metricsReporter.reportJobStart(jobId, documentId);
       // Load document from MongoDB
       const doc = await documentModel.findById(documentId);
       
@@ -185,9 +190,34 @@ const worker = new Worker(
 
       // Stage 5: Mark as complete
       await documentModel.markComplete(documentId);
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      // Report metrics
+      await metricsReporter.reportJobComplete({
+        jobId,
+        documentId,
+        startTime,
+        endTime,
+        duration,
+        success: true,
+      });
+      
       console.log(`[worker] Processing complete for document ${documentId}`);
     } catch (error: any) {
       console.error(`[worker] Error processing document ${documentId}:`, error);
+
+      // Report failed job metrics
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      await metricsReporter.reportJobComplete({
+        jobId,
+        documentId,
+        startTime,
+        endTime,
+        duration,
+        success: false,
+      });
 
       // Update document with error status and log
       try {

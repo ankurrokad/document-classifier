@@ -42,10 +42,16 @@ if (isNaN(redisPort)) {
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
+  
+  // Enable WebSocket support
+  app.useWebSocketAdapter(new IoAdapter(app));
+  
   await app.listen(3000);
   console.log('API running on http://localhost:3000');
+  console.log('Dashboard available at http://localhost:3000/dashboard');
 }
 bootstrap();
