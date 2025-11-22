@@ -3,8 +3,8 @@ module.exports = {
     {
       name: 'doc-api',
       script: 'packages/backend/dist/main.js',
-      instances: 1,
-      exec_mode: 'fork',
+      instances: 4,
+      exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production',
       },
@@ -18,6 +18,8 @@ module.exports = {
       error_file: './logs/api-error.log',
       out_file: './logs/api-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      // Merge logs from all instances
+      merge_logs: true,
       // Wait for graceful shutdown
       kill_timeout: 5000,
       // Wait time before considering app online
