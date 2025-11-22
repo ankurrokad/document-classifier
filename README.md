@@ -2,9 +2,31 @@
 
 > **Transform healthcare document chaos into organized, actionable insights — automatically.**
 
+**Version 1.0** 🎉
+
 Healthcare clinics and pharmacies receive hundreds of documents every day. Manually sorting, classifying, and filing them is time-consuming, error-prone, and takes staff away from what matters most: patient care.
 
 **CDIP automates this entire process.** Upload a PDF, and watch as our intelligent pipeline automatically reads, understands, classifies, and matches documents to the right patients — in seconds, not hours.
+
+## 🚀 Version 1.0 Highlights
+
+We've achieved **production-ready performance** with comprehensive load testing and optimization:
+
+- ✅ **Scalable Architecture** - Handles 200+ concurrent users with healthy performance
+- ✅ **Optimized Queue Processing** - Eliminated queue overload through multi-worker scaling
+- ✅ **Excellent Response Times** - Average 155ms API response time, P95 under 250ms
+- ✅ **99.4% Job Completion Rate** - Reliable processing even under high load
+- ✅ **System Health Score: 80/100** - Production-ready metrics
+
+📊 **See our [Load Test Performance Analysis](.docs/LOAD_TEST_ANALYSIS.md) for detailed metrics and optimization journey.**
+
+### What's Next: Version 2.0
+
+Version 2.0 will transform CDIP into a **full-featured application** with:
+- Modern web UI for document management
+- Enhanced user experience and workflows
+- Advanced features and integrations
+- And much more coming soon!
 
 ---
 
@@ -83,6 +105,7 @@ Before you begin, ensure you have the following installed:
 - **Docker** and **Docker Compose** ([Download Docker Desktop](https://www.docker.com/products/docker-desktop)) - For MinIO
 - **MongoDB Atlas Account** ([Sign up](https://www.mongodb.com/cloud/atlas)) - Cloud database
 - **Redis** - Installed locally ([Installation Guide](https://redis.io/docs/getting-started/))
+- **PM2** (optional, for production worker management) - Install globally: `npm install -g pm2`
 - **Git** (for cloning the repository)
 
 ### Verify Installation
@@ -205,7 +228,11 @@ SYNTH_DOC_COUNT=200
 
 The application consists of two main processes that need to run simultaneously:
 
-### 1. Start the API Server
+### Option 1: Development Mode (Using pnpm)
+
+For development and testing, you can run both processes using pnpm:
+
+#### 1. Start the API Server
 
 In your first terminal:
 
@@ -223,7 +250,7 @@ You should see:
 API running on http://localhost:3000
 ```
 
-### 2. Start the Worker
+#### 2. Start the Worker
 
 In a second terminal:
 
@@ -233,13 +260,54 @@ pnpm dev:worker
 
 This will:
 - Build the storage library
-- Start the BullMQ worker process
+- Start a single BullMQ worker process
 - Connect to Redis and begin processing jobs
 
 You should see:
 ```
 Worker started...
 ```
+
+### Option 2: Production Mode with PM2 (Recommended for Performance)
+
+For better performance and throughput, use PM2 to run multiple worker instances and manage both apps:
+
+**Prerequisites:**
+- Install PM2 globally: `npm install -g pm2`
+- Build all packages: `pnpm build:all`
+
+**Start all apps:**
+```bash
+pm2 start ecosystem.config.js
+```
+
+This will:
+- Start the API server (1 instance)
+- Start 4 worker instances in parallel
+- Auto-restart apps on crashes
+- Log all output to `logs/` directory
+
+**Start individual apps:**
+```bash
+pm2 start ecosystem.config.js --only doc-api      # Start only API server
+pm2 start ecosystem.config.js --only doc-worker    # Start only workers
+```
+
+**Manage apps:**
+```bash
+pm2 status                    # Check status of all apps
+pm2 logs                      # View logs from all apps
+pm2 logs doc-api              # View API logs only
+pm2 logs doc-worker           # View worker logs only
+pm2 restart doc-api           # Restart API server
+pm2 restart doc-worker        # Restart all workers
+pm2 stop doc-api              # Stop API server
+pm2 stop doc-worker           # Stop all workers
+pm2 stop all                  # Stop all apps
+pm2 delete all                # Remove all apps from PM2
+```
+
+**Note:** PM2 mode is recommended when processing high volumes of documents or when you need better performance. The development mode is suitable for testing and development. You can also mix approaches - for example, run the API with `pnpm dev:api` and workers with PM2.
 
 ### 3. Verify Everything is Running
 
@@ -711,7 +779,7 @@ pnpm build:storage
 
 ---
 
-## Current Status
+## Current Status - Version 1.0
 
 ### ✅ Completed Features
 
@@ -720,6 +788,20 @@ pnpm build:storage
 - **Metrics Dashboard**: Real-time monitoring with WebSocket updates
 - **Data Access Layer**: Centralized MongoDB schemas and models
 - **Queue Processing**: Full BullMQ integration with Redis
+- **Performance Optimization**: Multi-worker scaling with PM2 cluster mode
+- **Load Testing & Validation**: Comprehensive performance testing with 200+ concurrent users
+- **Production-Ready Scalability**: System health score of 80/100, handles high-volume loads
+
+### 🎯 Performance Achievements (v1.0)
+
+- **Queue Optimization**: Reduced queue depth from 265 to manageable levels (96% improvement)
+- **Worker Scaling**: Implemented 4-worker parallel processing architecture
+- **CPU Efficiency**: Improved from 99.4% to 86.1% CPU usage (better resource distribution)
+- **Job Completion**: Achieved 99.4% completion rate (497/500 jobs) under load
+- **Response Times**: Maintained excellent API performance (155ms average, 238ms P95)
+- **System Health**: Improved from 60/100 (DEGRADED) to 80/100 (HEALTHY)
+
+📊 **Detailed performance analysis**: See [Load Test Analysis](.docs/LOAD_TEST_ANALYSIS.md)
 
 ### 🚧 In Progress
 
@@ -727,13 +809,15 @@ pnpm build:storage
 - Processed artifacts storage
 - Enhanced error handling and retry mechanisms
 
-### 📋 Planned
+### 📋 Planned for Version 2.0
 
+- **Full-Featured Application**: Complete web UI and user experience
 - Tesseract OCR for scanned documents
 - Image preprocessing (deskew, grayscale)
 - Advanced ML models
 - Batch processing optimizations
 - Unit and integration tests
+- Enhanced workflows and integrations
 
 ---
 
