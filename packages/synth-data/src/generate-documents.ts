@@ -11,17 +11,35 @@ if (result.error) {
 import { makePrescriptionDoc } from "./templates/prescription";
 import { makeLabReport } from "./templates/lab-report";
 import { makeClinicNote } from "./templates/clinic-note";
-import { MinioStorage } from "@doc-clf/storage";
 import {
   connectMongoDB,
   disconnectMongoDB,
   PatientModel,
 } from "@doc-clf/dal";
+import * as path from "path";
+import * as fs from "fs";
 
-const bucket = process.env.MINIO_BUCKET_SYNTHETIC || "documents-synth";
-
-const minio = new MinioStorage();
 const patientModel = new PatientModel();
+
+// Find root-level .data directory
+function getDataDirectory(): string {
+  const possiblePaths = [
+    path.resolve(process.cwd(), '.data'),
+    path.resolve(process.cwd(), '../.data'),
+    path.resolve(process.cwd(), '../../.data'),
+    path.resolve(process.cwd(), '../../../.data'),
+    path.resolve(__dirname, '../../../../.data'),
+  ];
+
+  for (const dataPath of possiblePaths) {
+    if (fs.existsSync(dataPath)) {
+      return dataPath;
+    }
+  }
+
+  // Default to process.cwd()/.data if none found
+  return path.resolve(process.cwd(), '.data');
+}
 
 // Convert MongoDB patient to format expected by templates
 function formatPatientForTemplate(patient: any) {
@@ -57,6 +75,16 @@ async function run() {
       return;
     }
 
+    // Setup local data directory
+    const dataDir = getDataDirectory();
+    const documentsDir = path.join(dataDir, 'documents', 'original');
+    
+    // Create directory structure if it doesn't exist
+    if (!fs.existsSync(documentsDir)) {
+      fs.mkdirSync(documentsDir, { recursive: true });
+      console.log(`Created local data directory: ${documentsDir}`);
+    }
+
     let totalDocs = 0;
     let docCounter = 0;
 
@@ -88,18 +116,17 @@ async function run() {
         const baseName = fileName.replace(/\.pdf$/, "");
         const jsonContent = JSON.stringify(meta, null, 2);
 
-        // Create folder structure: documents/original/{baseName}/{baseName}.pdf
-        const pdfKey = `documents/original/${baseName}/${fileName}`;
-        const jsonKey = `documents/original/${baseName}/${baseName}.json`;
+        // Save to local filesystem
+        const localBaseDir = path.join(documentsDir, baseName);
+        if (!fs.existsSync(localBaseDir)) {
+          fs.mkdirSync(localBaseDir, { recursive: true });
+        }
 
-        await minio.uploadBuffer(bucket, pdfKey, buf, {
-          "x-amz-meta-doctype": meta.docType,
-        });
+        const localPdfPath = path.join(localBaseDir, fileName);
+        const localJsonPath = path.join(localBaseDir, `${baseName}.json`);
 
-        const jsonBuffer = Buffer.from(jsonContent, "utf-8");
-        await minio.uploadBuffer(bucket, jsonKey, jsonBuffer, {
-          "x-amz-meta-doctype": meta.docType,
-        });
+        fs.writeFileSync(localPdfPath, buf);
+        fs.writeFileSync(localJsonPath, jsonContent, 'utf-8');
 
         docCounter++;
         totalDocs++;
