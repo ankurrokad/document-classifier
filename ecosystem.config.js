@@ -28,7 +28,7 @@ module.exports = {
     {
       name: 'doc-worker',
       script: 'packages/pipeline/dist/worker.js',
-      instances: 4,
+      instances: "max",
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production',
