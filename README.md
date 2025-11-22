@@ -213,7 +213,7 @@ MINIO_BUCKET_ORIGINAL=documents-original
 MINIO_SSL=false
 
 # Optional: Synthetic Data Generation
-SYNTH_UPLOAD_TO_MINIO=true
+# Note: Synthetic data is now stored locally in .data/ folder for load testing
 SYNTH_DOC_COUNT=200
 ```
 
@@ -618,22 +618,23 @@ node packages/pipeline/dist/worker.js
 
 ### Generating Synthetic Data
 
-To generate test documents:
+To generate test documents for load testing:
 
 ```bash
-# Make sure MinIO is running
-docker-compose up -d
+# Generate patients first (if not already done)
+pnpm gen:patients 100
 
-# Generate and upload documents
-pnpm gen:data
+# Generate synthetic documents (saves to .data/documents/original/)
+pnpm gen:documents
 ```
 
 This will:
 - Generate PDFs (prescriptions, lab reports, clinic notes)
-- Upload them to MinIO
+- Save them locally to `.data/documents/original/` folder at project root
 - Include JSON metadata files
+- **Note**: Files are stored locally (not in MinIO) for optimal load testing performance
 
-Configure the count via `SYNTH_DOC_COUNT` in `.env`.
+The load test reads from this local `.data` directory, eliminating MinIO dependency during load tests.
 
 ---
 
@@ -659,7 +660,7 @@ Configure the count via `SYNTH_DOC_COUNT` in `.env`.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SYNTH_UPLOAD_TO_MINIO` | Upload synthetic data to MinIO | `false` |
+| `SYNTH_DOC_COUNT` | Number of synthetic documents to generate | `200` |
 | `SYNTH_DOC_COUNT` | Number of synthetic documents to generate | `200` |
 | `METRICS_HISTORY_SIZE` | Maximum number of metrics records to keep in memory | `1000` |
 | `METRICS_UPDATE_INTERVAL` | Dashboard WebSocket update interval (ms) | `2000` |

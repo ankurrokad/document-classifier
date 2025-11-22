@@ -7,7 +7,6 @@
     "start": "ts-node src/cli.ts"
   },
   "dependencies": {
-    "@doc-clf/storage": "workspace:*",
     "axios": "^1.6.0",
     "dotenv": "^17.2.3",
     "form-data": "^4.0.0",

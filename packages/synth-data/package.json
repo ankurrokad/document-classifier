@@ -9,7 +9,6 @@
     },
     "dependencies": {
       "@doc-clf/dal": "workspace:*",
-      "@doc-clf/storage": "workspace:*",
       "@faker-js/faker": "^8.0.0",
       "dotenv": "^17.2.3",
       "pdfkit": "^0.13.0",

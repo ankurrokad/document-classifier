@@ -1,11 +1,11 @@
-import { MinioFileReader } from './minio-reader';
+import { LocalFileReader } from './local-file-reader';
 import { LoadTestApiClient, RequestResult } from './api-client';
 import { SystemMetricsCollector, SystemSnapshot } from './metrics-collector';
 import { TestConfig } from './report/report-generator';
 
 export class LoadTestRunner {
   private config: TestConfig;
-  private fileReader: MinioFileReader;
+  private fileReader: LocalFileReader;
   private apiClient: LoadTestApiClient;
   private metricsCollector: SystemMetricsCollector;
   private requests: RequestResult[] = [];
@@ -15,7 +15,7 @@ export class LoadTestRunner {
 
   constructor(config: TestConfig) {
     this.config = config;
-    this.fileReader = new MinioFileReader();
+    this.fileReader = new LocalFileReader();
     this.apiClient = new LoadTestApiClient(config.apiBaseUrl, config.concurrency);
     this.metricsCollector = new SystemMetricsCollector(config.apiBaseUrl);
   }
@@ -37,13 +37,13 @@ export class LoadTestRunner {
         includeHealthCheck: this.config.includeHealthCheck,
       });
 
-      // Step 1: Read files from synthetic bucket
-      console.log('[LoadTest] Reading files from synthetic bucket...');
+      // Step 1: Read files from local data directory
+      console.log('[LoadTest] Reading files from local data directory...');
       const files = await this.fileReader.listSyntheticFiles();
       console.log(`[LoadTest] Found ${files.length} PDF files`);
 
       if (files.length === 0) {
-        throw new Error('No PDF files found in synthetic bucket');
+        throw new Error('No PDF files found in local data directory. Please generate synthetic documents first using: pnpm gen:documents');
       }
 
       // Limit files if totalRequests is specified

@@ -5,20 +5,22 @@ This package provides load testing capabilities for the document classifier API.
 ## Prerequisites
 
 - Node.js (v20 or higher)
-- Access to MinIO storage with synthetic test files
+- Synthetic test files generated in `.data` folder (see [Generating Test Data](#generating-test-data))
 - Running document classifier API instance
 
-## Environment Variables
+## Generating Test Data
 
-The load test requires the following environment variables to be set (typically in a `.env` file at the project root):
+Before running load tests, you need to generate synthetic documents. From the project root:
 
-- `MINIO_BUCKET_SYNTHETIC`: The name of the MinIO bucket containing synthetic PDF test files
-- MinIO connection variables (as required by `@doc-clf/storage` package):
-  - `MINIO_ENDPOINT`
-  - `MINIO_PORT`
-  - `MINIO_ACCESS_KEY`
-  - `MINIO_SECRET_KEY`
-  - `MINIO_USE_SSL`
+```bash
+# Generate patients first (if not already done)
+pnpm gen:patients 100
+
+# Generate synthetic documents (saves to .data/documents/original/)
+pnpm gen:documents
+```
+
+This will create PDF files in the `.data/documents/original/` folder structure at the project root. The load test reads from this local directory instead of MinIO for optimal performance.
 
 ## Installation
 
@@ -47,7 +49,7 @@ npm start
 
 This will:
 - Use 10 concurrent requests
-- Read all PDF files from the synthetic bucket
+- Read all PDF files from `.data/documents/original/` directory
 - Test against `http://localhost:3000`
 - Save reports to the `reports` directory
 
@@ -59,7 +61,7 @@ The load test supports several command-line arguments:
 |--------|-------------|---------|
 | `--concurrency` | Number of concurrent requests | `10` |
 | `--duration` | Test duration in seconds | Unlimited |
-| `--total-requests` | Maximum number of requests to send | All files in bucket |
+| `--total-requests` | Maximum number of requests to send | All files in `.data` directory |
 | `--api-url` | Base URL of the API to test | `http://localhost:3000` |
 | `--output-dir` | Directory to save reports | `reports` |
 | `--health-check` | Include health check requests (10% probability) | Disabled |
@@ -108,7 +110,7 @@ npm start -- --health-check --concurrency 10
 
 ## How It Works
 
-1. **File Reading**: The test reads PDF files from the MinIO synthetic bucket specified by `MINIO_BUCKET_SYNTHETIC`.
+1. **File Reading**: The test reads PDF files from the local `.data/documents/original/` directory at the project root. This eliminates MinIO dependency for load testing and provides better performance on local machines.
 
 2. **Concurrent Uploads**: Documents are uploaded concurrently based on the `--concurrency` setting. The test maintains a pool of concurrent requests.
 
@@ -154,16 +156,25 @@ The compiled output will be in the `dist/` directory.
 
 ## Troubleshooting
 
-### Error: MINIO_BUCKET_SYNTHETIC environment variable is not set
+### Error: Local data directory not found
 
-Ensure your `.env` file is in the project root and contains the `MINIO_BUCKET_SYNTHETIC` variable.
+If you see an error about the local data directory not being found:
 
-### No PDF files found in synthetic bucket
+1. Generate synthetic documents first:
+   ```bash
+   pnpm gen:documents
+   ```
+
+2. Verify that `.data/documents/original/` directory exists at the project root
+
+3. Ensure the directory contains PDF files
+
+### No PDF files found in local data directory
 
 Verify that:
-- The `MINIO_BUCKET_SYNTHETIC` bucket exists
-- The bucket contains PDF files
-- MinIO connection credentials are correct
+- The `.data/documents/original/` directory exists at the project root
+- The directory contains PDF files (generated using `pnpm gen:documents`)
+- You have read permissions for the `.data` directory
 
 ### Connection errors
 

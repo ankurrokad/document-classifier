@@ -62,6 +62,7 @@ Desktop.ini
 *.temp
 .cache/
 .temp/
+.data/
 
 # Docker
 .dockerignore

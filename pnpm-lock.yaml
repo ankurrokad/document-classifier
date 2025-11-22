@@ -116,9 +116,6 @@ importers:
 
   packages/load-test:
     dependencies:
-      '@doc-clf/storage':
-        specifier: workspace:*
-        version: link:../libs/storage
       axios:
         specifier: ^1.6.0
         version: 1.13.2
@@ -187,9 +184,6 @@ importers:
       '@doc-clf/dal':
         specifier: workspace:*
         version: link:../libs/dal
-      '@doc-clf/storage':
-        specifier: workspace:*
-        version: link:../libs/storage
       '@faker-js/faker':
         specifier: ^8.0.0
         version: 8.4.1

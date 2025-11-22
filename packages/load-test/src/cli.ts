@@ -83,12 +83,6 @@ async function main() {
   console.log('='.repeat(60));
   console.log('');
 
-  // Validate MINIO_BUCKET_SYNTHETIC
-  if (!process.env.MINIO_BUCKET_SYNTHETIC) {
-    console.error('ERROR: MINIO_BUCKET_SYNTHETIC environment variable is not set');
-    process.exit(1);
-  }
-
   // Create output directory if it doesn't exist
   if (!fs.existsSync(config.outputDir)) {
     fs.mkdirSync(config.outputDir, { recursive: true });
@@ -112,16 +106,6 @@ async function main() {
     const markdownPath = path.join(config.outputDir, `${reportBaseName}.md`);
     await fs.promises.writeFile(markdownPath, markdown, 'utf-8');
     console.log(`[CLI] Markdown report saved: ${markdownPath}`);
-
-    // Export JSON
-    const jsonPath = path.join(config.outputDir, `${reportBaseName}.json`);
-    await reportGenerator.exportJson(report, jsonPath);
-    console.log(`[CLI] JSON export saved: ${jsonPath}`);
-
-    // Export CSV
-    const csvPath = path.join(config.outputDir, `${reportBaseName}.csv`);
-    await reportGenerator.exportCsv(report, csvPath);
-    console.log(`[CLI] CSV export saved: ${csvPath}`);
 
     console.log('');
     console.log('='.repeat(60));
